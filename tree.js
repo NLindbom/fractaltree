@@ -1,6 +1,3 @@
-var canvas = document.querySelector('canvas'),
-	ctx = canvas.getContext('2d');
-
 class Transform{
 	constructor(rads, scale){
 		this.cos = Math.cos(rads) * scale;
@@ -51,28 +48,6 @@ class Point{
 	}
 }
 
-function angle(x, y, x2, y2){
-	return Math.atan2(y, x) - Math.atan2(y2, x2);	
-}
-
-var basePoint = new Point(400, 600, 4),
-	trunkPoint = new Point(400, 400, 4),
-	branchPoint1 = new Point(325, 325, 4),
-	branchPoint2 = new Point(525, 325, 4);
-
-function getTransforms() {
-	return [
-		new Transform(
-			angle(branchPoint1.x - trunkPoint.x, branchPoint1.y - trunkPoint.y, basePoint.x - trunkPoint.x, trunkPoint.y - basePoint.y), 
-			Point.length(branchPoint1, trunkPoint) / Point.length(trunkPoint, basePoint)), 
-		new Transform(
-			angle(branchPoint2.x - trunkPoint.x, branchPoint2.y - trunkPoint.y, basePoint.x - trunkPoint.x, trunkPoint.y - basePoint.y), 
-			Point.length(branchPoint2, trunkPoint) / Point.length(trunkPoint, basePoint)),
-	];
-}
-
-var transforms;
-
 class Branch{
 	constructor(x, y, ex, ey, width){
 		this.x = x;
@@ -94,12 +69,51 @@ class Branch{
 		ctx.beginPath();
 		ctx.lineWidth = this.width;
 		ctx.moveTo(parent_branch.x, parent_branch.y);
-		ctx.quadraticCurveTo(this.x, this.y, this.x+this.ex, this.y+this.ey);
+		ctx.quadraticCurveTo(this.x, this.y, this.x + this.ex, this.y + this.ey);
 		ctx.stroke();
-	}	
+	}
+
+	draw_smooth(parent_branch){
+		ctx.beginPath();
+		ctx.lineWidth = this.width;
+		ctx.moveTo(parent_branch.x + 0.5*parent_branch.ex, parent_branch.y + 0.5*parent_branch.ey);
+		ctx.quadraticCurveTo(this.x, this.y, this.x + 0.5*this.ex, this.y + 0.5*this.ey);
+		ctx.stroke();
+	}
+}
+
+var canvas = document.querySelector('canvas'),
+	ctx = canvas.getContext('2d');
+
+var	transforms,
+	drawing = false;
+
+var basePoint = new Point(400, 600, 4),
+	trunkPoint = new Point(400, 400, 4),
+	branchPoint1 = new Point(325, 325, 4),
+	branchPoint2 = new Point(525, 325, 4);
+
+function angle(x, y, x2, y2){
+	return Math.atan2(y, x) - Math.atan2(y2, x2);	
+}
+
+function getTransforms() {
+	return [
+		new Transform(
+			angle(branchPoint1.x - trunkPoint.x, branchPoint1.y - trunkPoint.y, basePoint.x - trunkPoint.x, trunkPoint.y - basePoint.y), 
+			Point.length(branchPoint1, trunkPoint) / Point.length(trunkPoint, basePoint)), 
+		new Transform(
+			angle(branchPoint2.x - trunkPoint.x, branchPoint2.y - trunkPoint.y, basePoint.x - trunkPoint.x, trunkPoint.y - basePoint.y), 
+			Point.length(branchPoint2, trunkPoint) / Point.length(trunkPoint, basePoint)),
+	];
 }
 
 function draw(){
+
+	if (drawing)
+		return;
+
+	drawing = true;
 
 	transforms = getTransforms();
 
@@ -116,18 +130,22 @@ function draw(){
 
 		draw_branches(trunk, 10);
 	}
+
+	drawing = false;
 }
 
 function draw_branches(parent_branch, depth)
 {
 	for (var i = 0; i < transforms.length; i++){
 		var branch = transforms[i].createBranch(parent_branch);
-		branch.draw_nested(parent_branch);			
+		branch.draw_smooth(parent_branch);			
 		if (depth > 0)
 			draw_branches(branch, depth - 1);
 		delete branch;
 	}	
 }
+
+draw();
 
 var mouseDownPoint;
 
@@ -149,20 +167,43 @@ function onMouseDown(e){
 function onMouseUp(e){
 	if (!mouseDownPoint)
 		return;
+
 	var mouseUpX = e.pageX - canvas.offsetLeft;
 	var mouseUpY = e.pageY - canvas.offsetTop;
-	mouseDownPoint.moveTo(mouseUpX, mouseUpY);
+
+	if (mouseDownPoint === trunkPoint){
+		var dx = mouseDownPoint.x - mouseUpX;
+		var dy = mouseDownPoint.y - mouseUpY;
+		branchPoint1.moveTo(branchPoint1.x + dx, branchPoint1.y + dy);
+		branchPoint2.moveTo(branchPoint2.x + dx, branchPoint2.y + dy);
+	}
+
+	mouseDownPoint.moveTo(mouseUpX, mouseUpY);	
 	mouseDownPoint = null;
+
 	draw();
 }
 
 function onMouseMove(e){
-
+	
+	if (mouseDownPoint)
+	{
+		var mouseX = e.pageX - canvas.offsetLeft;
+		var mouseY = e.pageY - canvas.offsetTop;
+	
+		if (mouseDownPoint === trunkPoint){
+			var dx = mouseDownPoint.x - mouseX;
+			var dy = mouseDownPoint.y - mouseY;
+			branchPoint1.moveTo(branchPoint1.x + dx, branchPoint1.y + dy);
+			branchPoint2.moveTo(branchPoint2.x + dx, branchPoint2.y + dy);
+		}
+	
+		mouseDownPoint.moveTo(mouseX, mouseY);	
+		
 		draw();
+	}
 }
 
 canvas.onmousedown = onMouseDown;
-canvas.onmousemove = onMouseMove;
 canvas.onmouseup = onMouseUp;
-
-draw();
+canvas.onmousemove = onMouseMove;
