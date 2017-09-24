@@ -1,20 +1,8 @@
-class Transform{
-	constructor(rads, scale){
-		this.cos = Math.cos(rads) * scale;
-		this.sin = Math.sin(rads) * scale;
-		this.scale = scale;
-	}
-	
-	createBranch(parent_branch)
-	{	
-		return new Branch(
-			parent_branch.x + parent_branch.ex,
-			parent_branch.y + parent_branch.ey,
-			parent_branch.ex * this.cos - parent_branch.ey * this.sin, 
-			parent_branch.ey * this.cos + parent_branch.ex * this.sin,
-			parent_branch.width * this.scale);
-	}
-}
+var canvas = document.querySelector('canvas'),
+	ctx = canvas.getContext('2d');
+
+var	transforms,
+	drawing = false;
 
 class Point{
 	constructor(x, y, radius){
@@ -47,6 +35,13 @@ class Point{
 		return Math.sqrt(dx * dx + dy * dy);
 	}
 }
+
+var basePoint = new Point(400, 600, 4),
+	trunkPoint = new Point(400, 400, 4),
+	branchPoint1 = new Point(325, 325, 4),
+	branchPoint2 = new Point(525, 325, 4);
+
+var selectedPoint;
 
 class Branch{
 	constructor(x, y, ex, ey, width){
@@ -82,16 +77,23 @@ class Branch{
 	}
 }
 
-var canvas = document.querySelector('canvas'),
-	ctx = canvas.getContext('2d');
-
-var	transforms,
-	drawing = false;
-
-var basePoint = new Point(400, 600, 4),
-	trunkPoint = new Point(400, 400, 4),
-	branchPoint1 = new Point(325, 325, 4),
-	branchPoint2 = new Point(525, 325, 4);
+class Transform{
+	constructor(rads, scale){
+		this.cos = Math.cos(rads) * scale;
+		this.sin = Math.sin(rads) * scale;
+		this.scale = scale;
+	}
+	
+	createBranch(parent_branch)
+	{	
+		return new Branch(
+			parent_branch.x + parent_branch.ex,
+			parent_branch.y + parent_branch.ey,
+			parent_branch.ex * this.cos - parent_branch.ey * this.sin, 
+			parent_branch.ey * this.cos + parent_branch.ex * this.sin,
+			parent_branch.width * this.scale);
+	}
+}
 
 function angle(x, y, x2, y2){
 	return Math.atan2(y, x) - Math.atan2(y2, x2);	
@@ -147,63 +149,82 @@ function draw_branches(parent_branch, depth)
 
 draw();
 
-var mouseDownPoint;
-
-function onMouseDown(e){
-	var mouseDownX = e.pageX - canvas.offsetLeft;
-	var mouseDownY = e.pageY - canvas.offsetTop;
-	
-	if (trunkPoint.inside(mouseDownX, mouseDownY)){
-		mouseDownPoint = trunkPoint;
-	}
-	else if (branchPoint1.inside(mouseDownX, mouseDownY)){
-		mouseDownPoint = branchPoint1;
-	}
-	else if (branchPoint2.inside(mouseDownX, mouseDownY)){
-		mouseDownPoint = branchPoint2;
-	}
-}
-
-function onMouseUp(e){
-	if (!mouseDownPoint)
-		return;
-
-	var mouseUpX = e.pageX - canvas.offsetLeft;
-	var mouseUpY = e.pageY - canvas.offsetTop;
-
-	if (mouseDownPoint === trunkPoint){
-		var dx = mouseDownPoint.x - mouseUpX;
-		var dy = mouseDownPoint.y - mouseUpY;
+function movePoint(x, y){
+	if (selectedPoint === trunkPoint){
+		var dx = selectedPoint.x - x;
+		var dy = selectedPoint.y - y;
 		branchPoint1.moveTo(branchPoint1.x + dx, branchPoint1.y + dy);
 		branchPoint2.moveTo(branchPoint2.x + dx, branchPoint2.y + dy);
 	}
-
-	mouseDownPoint.moveTo(mouseUpX, mouseUpY);	
-	mouseDownPoint = null;
-
-	draw();
+	selectedPoint.moveTo(x, y);	
 }
 
-function onMouseMove(e){
+canvas.addEventListener("mousedown", function (e){
+	var x = e.pageX - canvas.offsetLeft;
+	var y = e.pageY - canvas.offsetTop;
 	
-	if (mouseDownPoint)
-	{
-		var mouseX = e.pageX - canvas.offsetLeft;
-		var mouseY = e.pageY - canvas.offsetTop;
-	
-		if (mouseDownPoint === trunkPoint){
-			var dx = mouseDownPoint.x - mouseX;
-			var dy = mouseDownPoint.y - mouseY;
-			branchPoint1.moveTo(branchPoint1.x + dx, branchPoint1.y + dy);
-			branchPoint2.moveTo(branchPoint2.x + dx, branchPoint2.y + dy);
-		}
-	
-		mouseDownPoint.moveTo(mouseX, mouseY);	
-		
+	if (trunkPoint.inside(x, y)){
+		selectedPoint = trunkPoint;
+	}
+	else if (branchPoint1.inside(x, y)){
+		selectedPoint = branchPoint1;
+	}
+	else if (branchPoint2.inside(x, y)){
+		selectedPoint = branchPoint2;
+	}
+}, false);
+
+canvas.addEventListener("mouseup", function (e){
+	if (!selectedPoint)
+		return;
+	movePoint(e.pageX - canvas.offsetLeft, e.pageY - canvas.offsetTop);
+	selectedPoint = null;
+	draw();
+}, false);
+
+canvas.addEventListener("mousemove", function (e){	
+	if (selectedPoint) {
+		movePoint(e.pageX - canvas.offsetLeft, e.pageY - canvas.offsetTop);		
 		draw();
 	}
+}, false);
+
+function dispatchMouseEvent(e, type)
+{
+	// dispatch touch event to mouse event
+	var touch = e.touches[0];
+	var mouseEvent = new MouseEvent(type, { 
+		pageX: touch.pageX,
+		pageY: touch.pageY
+	});
+	canvas.dispatchEvent(mouseEvent);
 }
 
-canvas.onmousedown = onMouseDown;
-canvas.onmouseup = onMouseUp;
-canvas.onmousemove = onMouseMove;
+canvas.addEventListener("touchstart", function (e){ 
+	dispatchMouseEvent(e, "mousedown"); 
+}, false);
+
+canvas.addEventListener("touchmove", function (e){ 
+	dispatchMouseEvent(e, "mousemove"); 
+}, false);
+
+canvas.addEventListener("touchend", function (e) { 
+	dispatchMouseEvent(e, "mouseup"); 
+}, false);
+
+function preventTouchScrolling(e) {
+	if (e.target == canvas)
+		e.preventDefault();
+}
+
+document.body.addEventListener("touchstart", function (e) {
+	preventTouchScrolling(e);
+}, false);
+
+document.body.addEventListener("touchmove", function (e) {
+	preventTouchScrolling(e);
+}, false);
+
+document.body.addEventListener("touchend", function (e) {
+	preventTouchScrolling(e);
+}, false);
