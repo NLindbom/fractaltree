@@ -54,6 +54,7 @@ var FractalTree = (function(){
 				branch2: new Point(525, 325)
 			},
 			pointVisibility: enums.pointVisibility.visible,
+			depth: 10,
 		};
 
 		var	parameters = (function() {
@@ -71,7 +72,7 @@ var FractalTree = (function(){
 		
 		var setConfigProperty = function(object, property, value) {
 			if (typeof value !== "undefined")
-				object[property] = value;
+				object[property] = parseInt(value);
 		};
 
 		setConfigProperty(state, "name", parameters["name"]);
@@ -86,6 +87,7 @@ var FractalTree = (function(){
 		setConfigProperty(state.points.branch1, "y", parameters["y2"]);
 		setConfigProperty(state.points.branch2, "x", parameters["x3"]);
 		setConfigProperty(state.points.branch2, "y", parameters["y3"]);	
+		setConfigProperty(state, "depth", parameters["depth"])
 		
 		return state;
 	})();
@@ -210,9 +212,9 @@ var FractalTree = (function(){
 			ctx.stroke();
 			// Draw branches
 			if (config.drawMode === enums.drawModes.smooth)
-				_drawSmooth(branch, transforms, 10);
+				_drawSmooth(branch, transforms, config.depth);
 			else if (config.drawMode === enums.drawModes.interlaced)
-				_drawInterlaced(branch, transforms, 10);
+				_drawInterlaced(branch, transforms, config.depth);
 			// Draw Points
 			if (config.pointVisibility == enums.pointVisibility.visible) {
 				for (var i = 0; i < points.length; i++) {
